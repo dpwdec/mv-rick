@@ -4,39 +4,49 @@
 require('dotenv').config();
 const Discord = require('discord.js');
 const client = new Discord.Client();
+const Reception = require('./reception');
 
-const activeChannel = '759690596913905664';
-
+const reception = new Reception('./emojiReception.json');
+const activeChannel = '322312912419028993';
 const messageReportMap = {};
+
+//759690596913905664 => dev channel
+//322312912419028993 => mv channel
 
 client.once('ready', () => {
 	console.log('Ready!');
 });
 
-client.on('message', message => {
-  if(message.channel.id == '759690596913905664' && !(message.author instanceof Discord.ClientUser)) {
-    message.channel.send('🐈');
-  }
-});
+// client.on('message', message => {
+//   // console.log(message.channel.id);
+//   // if(message.channel.id == '759690596913905664' && !(message.author instanceof Discord.ClientUser)) {
+//   //   message.channel.send('🐈');
+//   // }
+// });
 
 client.on('messageReactionAdd', async (reaction, user) => {
   if(reaction.message.channel != activeChannel) { return }
 
   const rMessage = reaction.message;
 
-  // console.log(rMessage.reactions.cache);
+  let reactionList = {};
+  Array.from(rMessage.reactions.cache.keys()).forEach(key => {
+    reactionList[key] = rMessage.reactions.cache.get(key).count;
+  })
 
+  const verdict = `The reception to this video is ${reception.getReception(reactionList)}.`;
+
+  // create a new message if one doesn't exist with the verdict
   if(messageReportMap[rMessage.id] == undefined) {
-    const botMessage = await rMessage.channel.send(`The reaction to the message is ${reaction.emoji}`);
+    const botMessage = await rMessage.channel.send(verdict);
     messageReportMap[rMessage.id] = botMessage.id;
+  // otherwise load the previous message associated with the verdict and update it
   } else {
     const botMessage = await rMessage.channel.messages.fetch(messageReportMap[rMessage.id]);
-    let emojiList = '';
-    Array.from(rMessage.reactions.cache.keys()).forEach(key => emojiList += key);
-    botMessage.edit(`The reaction to the message is ${emojiList}`);
+    // only edit the message if it changed
+    if(verdict == botMessage.content) { return }
+    botMessage.edit(verdict);
   }
 });
 
-// read in JSON file with all the emoji as keys and whether they are negative, positive, or mixed, or if its all one emoji that is the reception of the video.
-
-client.login(process.env.CLIENT_ID);
+client.login(process.env.PROD_CLIENT_ID);
